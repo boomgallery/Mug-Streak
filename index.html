@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#2f855a" />
+  <title>Mug Streak</title>
+  <style>
+    :root{
+      --bg:#f7fafc; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
+      --green:#2f855a; --green-soft:#dff4e7; --red:#b83232; --red-soft:#fde8e8;
+      --border:#e5e7eb; --shadow:0 8px 24px rgba(0,0,0,.07);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+    .wrap{max-width:820px;margin:0 auto;padding:20px 14px 48px}
+    h1{margin:0;font-size:30px}
+    .sub{color:var(--muted);margin:4px 0 18px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+    .stat,.card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+    .stat{padding:14px}
+    .stat .n{font-size:26px;font-weight:800}
+    .stat .l{font-size:13px;color:var(--muted)}
+    .card{padding:16px;margin-top:14px}
+    .today-actions{display:flex;gap:10px;flex-wrap:wrap}
+    button{border:0;border-radius:12px;padding:11px 14px;font-size:15px;font-weight:700;cursor:pointer}
+    .primary{background:var(--green);color:white}
+    .danger{background:var(--red);color:white}
+    .ghost{background:#eef2f7;color:var(--text)}
+    input,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:16px;background:white}
+    textarea{min-height:70px;resize:vertical}
+    label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+    .calendar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+    .calendar-head h2{margin:0;font-size:20px;text-align:center;flex:1}
+    .week,.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .week div{font-size:12px;color:var(--muted);text-align:center;padding:4px}
+    .day{aspect-ratio:1/1;border:1px solid var(--border);border-radius:12px;background:white;padding:6px;position:relative;min-height:72px}
+    .day.other{opacity:.35}
+    .day.today{outline:2px solid #4a5568}
+    .day.af{background:var(--green-soft);border-color:#9bd4ae}
+    .day.drink{background:var(--red-soft);border-color:#e9aaaa}
+    .num{font-size:12px;font-weight:700}
+    .mug{font-size:24px;position:absolute;left:50%;top:50%;transform:translate(-50%,-45%)}
+    .drinks{position:absolute;bottom:6px;right:7px;font-size:12px;font-weight:800;color:var(--red)}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:12px}
+    .dot{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+    .footer-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .small{font-size:12px;color:var(--muted);line-height:1.4}
+    @media(max-width:560px){
+      .grid{grid-template-columns:1fr}
+      .day{min-height:58px}
+      .mug{font-size:21px}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mug Streak ☕</h1>
+  <div class="sub">One green mug for every alcohol-free day.</div>
+
+  <div class="grid">
+    <div class="stat"><div class="n" id="currentStreak">0</div><div class="l">Current alcohol-free streak</div></div>
+    <div class="stat"><div class="n" id="bestStreak">0</div><div class="l">Best streak</div></div>
+    <div class="stat"><div class="n" id="monthAF">0</div><div class="l">Alcohol-free days this month</div></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Log today</h2>
+    <div class="today-actions">
+      <button class="primary" id="afBtn">☕ Alcohol-free</button>
+      <button class="danger" id="drinkBtn">Log drinks</button>
+      <button class="ghost" id="clearBtn">Clear today</button>
+    </div>
+    <div id="drinkFields" style="display:none">
+      <label for="drinkCount">Number of standard drinks</label>
+      <input id="drinkCount" type="number" min="0" step="0.5" inputmode="decimal" placeholder="e.g., 4" />
+      <button class="danger" id="saveDrinkBtn" style="margin-top:10px">Save drink day</button>
+    </div>
+    <label for="note">Optional note</label>
+    <textarea id="note" placeholder="What helped today? What do you want to remember tomorrow?"></textarea>
+    <button class="ghost" id="saveNoteBtn" style="margin-top:8px">Save note</button>
+    <div class="small" id="todayStatus" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <div class="calendar-head">
+      <button class="ghost" id="prevBtn">‹</button>
+      <h2 id="monthTitle"></h2>
+      <button class="ghost" id="nextBtn">›</button>
+    </div>
+    <div class="week"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+    <div class="cal" id="calendar"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--green-soft);border:1px solid #9bd4ae"></span>Alcohol-free</span>
+      <span><span class="dot" style="background:var(--red-soft);border:1px solid #e9aaaa"></span>Drank</span>
+      <span><span class="dot" style="background:white;border:1px solid var(--border)"></span>Not logged</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Your data</h2>
+    <div class="small">Everything is stored only in this browser. Export a backup occasionally.</div>
+    <div class="footer-actions">
+      <button class="ghost" id="exportBtn">Export backup</button>
+      <label class="ghost" style="display:inline-block;padding:11px 14px;border-radius:12px;font-weight:700;cursor:pointer;margin:0">
+        Import backup<input id="importInput" type="file" accept="application/json" style="display:none">
+      </label>
+      <button class="ghost" id="resetBtn">Reset all data</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY = "mugStreakDataV1";
+let data = JSON.parse(localStorage.getItem(KEY) || "{}");
+let view = new Date();
+view.setDate(1);
+
+const pad=n=>String(n).padStart(2,"0");
+const keyFor=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const todayKey=keyFor(new Date());
+function save(){ localStorage.setItem(KEY, JSON.stringify(data)); render(); }
+function parseKey(k){ const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d); }
+
+function streaks(){
+  const keys=Object.keys(data).filter(k=>data[k]?.status==="af").sort();
+  let best=0, run=0, prev=null;
+  for(const k of keys){
+    const d=parseKey(k);
+    if(prev && Math.round((d-prev)/86400000)===1) run++; else run=1;
+    best=Math.max(best,run); prev=d;
+  }
+  let current=0, d=new Date();
+  // A not-yet-logged today should not automatically break yesterday's streak.
+  if(data[keyFor(d)]?.status!=="af") d.setDate(d.getDate()-1);
+  while(data[keyFor(d)]?.status==="af"){ current++; d.setDate(d.getDate()-1); }
+  return {current,best};
+}
+
+function render(){
+  const s=streaks();
+  document.getElementById("currentStreak").textContent=s.current;
+  document.getElementById("bestStreak").textContent=s.best;
+
+  const y=view.getFullYear(), m=view.getMonth();
+  const monthAF=Object.entries(data).filter(([k,v])=>{
+    const d=parseKey(k); return d.getFullYear()===y && d.getMonth()===m && v.status==="af";
+  }).length;
+  document.getElementById("monthAF").textContent=monthAF;
+  document.getElementById("monthTitle").textContent=view.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+
+  const cal=document.getElementById("calendar"); cal.innerHTML="";
+  const first=new Date(y,m,1);
+  const start=new Date(y,m,1-first.getDay());
+  for(let i=0;i<42;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const k=keyFor(d), rec=data[k];
+    const cell=document.createElement("button");
+    cell.className="day";
+    cell.style.padding="6px";
+    if(d.getMonth()!==m) cell.classList.add("other");
+    if(k===todayKey) cell.classList.add("today");
+    if(rec?.status==="af") cell.classList.add("af");
+    if(rec?.status==="drink") cell.classList.add("drink");
+    cell.innerHTML=`<span class="num">${d.getDate()}</span>` +
+      (rec?.status==="af" ? `<span class="mug">☕</span>` : "") +
+      (rec?.status==="drink" ? `<span class="drinks">${rec.drinks ?? "?"}</span>` : "");
+    cell.title = rec?.note || "";
+    cell.onclick=()=>editDate(k);
+    cal.appendChild(cell);
+  }
+
+  const rec=data[todayKey];
+  document.getElementById("note").value=rec?.note || "";
+  document.getElementById("todayStatus").textContent =
+    rec?.status==="af" ? "Today is logged alcohol-free. ☕" :
+    rec?.status==="drink" ? `Today is logged with ${rec.drinks ?? "an unknown number of"} standard drinks.` :
+    "Today is not logged yet.";
+}
+
+function editDate(k){
+  const existing=data[k] || {};
+  const choice=prompt(
+    `Edit ${k}\nType: af = alcohol-free, drink = drank, clear = remove`,
+    existing.status==="af" ? "af" : existing.status==="drink" ? "drink" : ""
+  );
+  if(choice===null) return;
+  const c=choice.trim().toLowerCase();
+  if(c==="af"){
+    data[k]={...existing,status:"af",drinks:0};
+  } else if(c==="drink"){
+    const n=prompt("How many standard drinks?", existing.drinks ?? "");
+    if(n===null) return;
+    const val=Number(n);
+    data[k]={...existing,status:"drink",drinks:Number.isFinite(val)?val:null};
+  } else if(c==="clear"){
+    delete data[k];
+  } else {
+    alert("Use af, drink, or clear.");
+    return;
+  }
+  save();
+}
+
+document.getElementById("afBtn").onclick=()=>{
+  data[todayKey]={...(data[todayKey]||{}),status:"af",drinks:0};
+  document.getElementById("drinkFields").style.display="none";
+  save();
+};
+document.getElementById("drinkBtn").onclick=()=>{
+  const el=document.getElementById("drinkFields");
+  el.style.display=el.style.display==="none"?"block":"none";
+};
+document.getElementById("saveDrinkBtn").onclick=()=>{
+  const n=Number(document.getElementById("drinkCount").value);
+  if(!Number.isFinite(n) || n<0){ alert("Enter a valid number."); return; }
+  data[todayKey]={...(data[todayKey]||{}),status:"drink",drinks:n};
+  document.getElementById("drinkFields").style.display="none";
+  save();
+};
+document.getElementById("clearBtn").onclick=()=>{ delete data[todayKey]; save(); };
+document.getElementById("saveNoteBtn").onclick=()=>{
+  const note=document.getElementById("note").value.trim();
+  data[todayKey]={...(data[todayKey]||{}),note};
+  save();
+};
+document.getElementById("prevBtn").onclick=()=>{ view.setMonth(view.getMonth()-1); render(); };
+document.getElementById("nextBtn").onclick=()=>{ view.setMonth(view.getMonth()+1); render(); };
+
+document.getElementById("exportBtn").onclick=()=>{
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`mug-streak-backup-${todayKey}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+document.getElementById("importInput").onchange=async(e)=>{
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    const obj=JSON.parse(await file.text());
+    if(typeof obj!=="object" || Array.isArray(obj)) throw new Error();
+    data=obj; save(); alert("Backup imported.");
+  }catch{ alert("That does not look like a valid Mug Streak backup."); }
+};
+document.getElementById("resetBtn").onclick=()=>{
+  if(confirm("Delete all Mug Streak data from this browser?")){ data={}; save(); }
+};
+
+render();
+</script>
+</body>
+</html>
