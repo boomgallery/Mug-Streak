@@ -22,12 +22,12 @@
     .stat .n{font-size:26px;font-weight:800}
     .stat .l{font-size:13px;color:var(--muted)}
     .card{padding:16px;margin-top:14px}
-    .today-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .today-actions,.footer-actions{display:flex;gap:10px;flex-wrap:wrap}
     button{border:0;border-radius:12px;padding:11px 14px;font-size:15px;font-weight:700;cursor:pointer}
     .primary{background:var(--green);color:white}
     .danger{background:var(--red);color:white}
     .ghost{background:#eef2f7;color:var(--text)}
-    input,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:16px;background:white}
+    input,textarea,select{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:16px;background:white}
     textarea{min-height:70px;resize:vertical}
     label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
     .calendar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
@@ -44,12 +44,17 @@
     .drinks{position:absolute;bottom:6px;right:7px;font-size:12px;font-weight:800;color:var(--red)}
     .legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:12px}
     .dot{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
-    .footer-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
     .small{font-size:12px;color:var(--muted);line-height:1.4}
+    .bev-row{display:grid;grid-template-columns:1.2fr .8fr .8fr auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border)}
+    .bev-row .field label{margin:0 0 5px}
+    .remove{padding:10px 12px}
+    .calc-total{margin:12px 0;padding:12px;border-radius:12px;background:#fff7ed;font-weight:800}
     @media(max-width:560px){
       .grid{grid-template-columns:1fr}
       .day{min-height:58px}
       .mug{font-size:21px}
+      .bev-row{grid-template-columns:1fr 1fr}
+      .bev-row .remove{grid-column:2}
     }
   </style>
 </head>
@@ -71,11 +76,21 @@
       <button class="danger" id="drinkBtn">Log drinks</button>
       <button class="ghost" id="clearBtn">Clear today</button>
     </div>
+
     <div id="drinkFields" style="display:none">
-      <label for="drinkCount">Number of standard drinks</label>
-      <input id="drinkCount" type="number" min="0" step="0.5" inputmode="decimal" placeholder="e.g., 4" />
+      <div class="small" style="margin-top:12px">
+        Enter each beverage’s amount and ABV. The app uses the U.S. definition of one standard drink: 0.6 fl oz (14 g) of pure alcohol.
+      </div>
+      <div id="beverageList"></div>
+      <button class="ghost" id="addBeverageBtn" style="margin-top:10px">+ Add another beverage</button>
+      <div class="calc-total">Calculated total: <span id="calculatedTotal">0.00</span> standard drinks</div>
+
+      <label for="manualOverride">Optional manual override</label>
+      <input id="manualOverride" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Leave blank to use calculated total" />
+
       <button class="danger" id="saveDrinkBtn" style="margin-top:10px">Save drink day</button>
     </div>
+
     <label for="note">Optional note</label>
     <textarea id="note" placeholder="What helped today? What do you want to remember tomorrow?"></textarea>
     <button class="ghost" id="saveNoteBtn" style="margin-top:8px">Save note</button>
@@ -100,7 +115,7 @@
   <div class="card">
     <h2 style="margin-top:0">Your data</h2>
     <div class="small">Everything is stored only in this browser. Export a backup occasionally.</div>
-    <div class="footer-actions">
+    <div class="footer-actions" style="margin-top:12px">
       <button class="ghost" id="exportBtn">Export backup</button>
       <label class="ghost" style="display:inline-block;padding:11px 14px;border-radius:12px;font-weight:700;cursor:pointer;margin:0">
         Import backup<input id="importInput" type="file" accept="application/json" style="display:none">
@@ -113,14 +128,60 @@
 <script>
 const KEY = "mugStreakDataV1";
 let data = JSON.parse(localStorage.getItem(KEY) || "{}");
-let view = new Date();
-view.setDate(1);
+let view = new Date(); view.setDate(1);
+let beverages = [{amount:"", unit:"oz", abv:""}];
 
 const pad=n=>String(n).padStart(2,"0");
 const keyFor=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const todayKey=keyFor(new Date());
 function save(){ localStorage.setItem(KEY, JSON.stringify(data)); render(); }
 function parseKey(k){ const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d); }
+
+function standardDrinks(amount, unit, abv){
+  const n=Number(amount), pct=Number(abv);
+  if(!Number.isFinite(n) || !Number.isFinite(pct) || n<0 || pct<0) return 0;
+  const ounces = unit==="ml" ? n/29.5735 : n;
+  return (ounces * (pct/100)) / 0.6;
+}
+
+function beverageTotal(){
+  return beverages.reduce((sum,b)=>sum+standardDrinks(b.amount,b.unit,b.abv),0);
+}
+
+function renderBeverages(){
+  const list=document.getElementById("beverageList");
+  list.innerHTML="";
+  beverages.forEach((b,i)=>{
+    const row=document.createElement("div");
+    row.className="bev-row";
+    row.innerHTML=`
+      <div class="field"><label>Amount</label><input type="number" min="0" step="0.1" inputmode="decimal" value="${b.amount}" data-i="${i}" data-k="amount" placeholder="e.g., 19"></div>
+      <div class="field"><label>Unit</label><select data-i="${i}" data-k="unit"><option value="oz" ${b.unit==="oz"?"selected":""}>fl oz</option><option value="ml" ${b.unit==="ml"?"selected":""}>mL</option></select></div>
+      <div class="field"><label>ABV %</label><input type="number" min="0" max="100" step="0.1" inputmode="decimal" value="${b.abv}" data-i="${i}" data-k="abv" placeholder="e.g., 6.7"></div>
+      <button class="ghost remove" data-remove="${i}" ${beverages.length===1?"disabled":""}>Remove</button>`;
+    list.appendChild(row);
+  });
+
+  list.querySelectorAll("input,select").forEach(el=>{
+    el.addEventListener("input",e=>{
+      const i=Number(e.target.dataset.i), k=e.target.dataset.k;
+      beverages[i][k]=e.target.value;
+      updateCalculatedTotal();
+    });
+  });
+  list.querySelectorAll("[data-remove]").forEach(btn=>{
+    btn.onclick=()=>{
+      beverages.splice(Number(btn.dataset.remove),1);
+      renderBeverages();
+      updateCalculatedTotal();
+    };
+  });
+  updateCalculatedTotal();
+}
+
+function updateCalculatedTotal(){
+  document.getElementById("calculatedTotal").textContent=beverageTotal().toFixed(2);
+}
 
 function streaks(){
   const keys=Object.keys(data).filter(k=>data[k]?.status==="af").sort();
@@ -131,7 +192,6 @@ function streaks(){
     best=Math.max(best,run); prev=d;
   }
   let current=0, d=new Date();
-  // A not-yet-logged today should not automatically break yesterday's streak.
   if(data[keyFor(d)]?.status!=="af") d.setDate(d.getDate()-1);
   while(data[keyFor(d)]?.status==="af"){ current++; d.setDate(d.getDate()-1); }
   return {current,best};
@@ -157,14 +217,13 @@ function render(){
     const k=keyFor(d), rec=data[k];
     const cell=document.createElement("button");
     cell.className="day";
-    cell.style.padding="6px";
     if(d.getMonth()!==m) cell.classList.add("other");
     if(k===todayKey) cell.classList.add("today");
     if(rec?.status==="af") cell.classList.add("af");
     if(rec?.status==="drink") cell.classList.add("drink");
     cell.innerHTML=`<span class="num">${d.getDate()}</span>` +
       (rec?.status==="af" ? `<span class="mug">☕</span>` : "") +
-      (rec?.status==="drink" ? `<span class="drinks">${rec.drinks ?? "?"}</span>` : "");
+      (rec?.status==="drink" ? `<span class="drinks">${Number(rec.drinks ?? 0).toFixed(1)}</span>` : "");
     cell.title = rec?.note || "";
     cell.onclick=()=>editDate(k);
     cal.appendChild(cell);
@@ -174,20 +233,18 @@ function render(){
   document.getElementById("note").value=rec?.note || "";
   document.getElementById("todayStatus").textContent =
     rec?.status==="af" ? "Today is logged alcohol-free. ☕" :
-    rec?.status==="drink" ? `Today is logged with ${rec.drinks ?? "an unknown number of"} standard drinks.` :
+    rec?.status==="drink" ? `Today is logged with ${Number(rec.drinks ?? 0).toFixed(2)} standard drinks.` :
     "Today is not logged yet.";
 }
 
 function editDate(k){
   const existing=data[k] || {};
-  const choice=prompt(
-    `Edit ${k}\nType: af = alcohol-free, drink = drank, clear = remove`,
-    existing.status==="af" ? "af" : existing.status==="drink" ? "drink" : ""
-  );
+  const choice=prompt(`Edit ${k}\nType: af = alcohol-free, drink = drank, clear = remove`,
+    existing.status==="af" ? "af" : existing.status==="drink" ? "drink" : "");
   if(choice===null) return;
   const c=choice.trim().toLowerCase();
   if(c==="af"){
-    data[k]={...existing,status:"af",drinks:0};
+    data[k]={...existing,status:"af",drinks:0,beverages:[]};
   } else if(c==="drink"){
     const n=prompt("How many standard drinks?", existing.drinks ?? "");
     if(n===null) return;
@@ -196,33 +253,55 @@ function editDate(k){
   } else if(c==="clear"){
     delete data[k];
   } else {
-    alert("Use af, drink, or clear.");
-    return;
+    alert("Use af, drink, or clear."); return;
   }
   save();
 }
 
 document.getElementById("afBtn").onclick=()=>{
-  data[todayKey]={...(data[todayKey]||{}),status:"af",drinks:0};
+  data[todayKey]={...(data[todayKey]||{}),status:"af",drinks:0,beverages:[]};
   document.getElementById("drinkFields").style.display="none";
   save();
 };
+
 document.getElementById("drinkBtn").onclick=()=>{
   const el=document.getElementById("drinkFields");
-  el.style.display=el.style.display==="none"?"block":"none";
+  const opening=el.style.display==="none";
+  el.style.display=opening?"block":"none";
+  if(opening){
+    const existing=data[todayKey];
+    beverages = existing?.beverages?.length ? existing.beverages.map(x=>({...x})) : [{amount:"",unit:"oz",abv:""}];
+    document.getElementById("manualOverride").value="";
+    renderBeverages();
+  }
 };
+
+document.getElementById("addBeverageBtn").onclick=()=>{
+  beverages.push({amount:"",unit:"oz",abv:""});
+  renderBeverages();
+};
+
 document.getElementById("saveDrinkBtn").onclick=()=>{
-  const n=Number(document.getElementById("drinkCount").value);
-  if(!Number.isFinite(n) || n<0){ alert("Enter a valid number."); return; }
-  data[todayKey]={...(data[todayKey]||{}),status:"drink",drinks:n};
+  const calc=beverageTotal();
+  const overrideRaw=document.getElementById("manualOverride").value.trim();
+  const override=overrideRaw==="" ? null : Number(overrideRaw);
+  const total=override===null ? calc : override;
+  if(!Number.isFinite(total) || total<0){ alert("Enter valid beverage information or a valid manual override."); return; }
+  if(total===0 && !confirm("Calculated total is 0. Save this as a drinking day?")) return;
+  data[todayKey]={
+    ...(data[todayKey]||{}),
+    status:"drink",
+    drinks:Number(total.toFixed(3)),
+    beverages:beverages.map(b=>({amount:Number(b.amount)||0,unit:b.unit,abv:Number(b.abv)||0}))
+  };
   document.getElementById("drinkFields").style.display="none";
   save();
 };
+
 document.getElementById("clearBtn").onclick=()=>{ delete data[todayKey]; save(); };
 document.getElementById("saveNoteBtn").onclick=()=>{
   const note=document.getElementById("note").value.trim();
-  data[todayKey]={...(data[todayKey]||{}),note};
-  save();
+  data[todayKey]={...(data[todayKey]||{}),note}; save();
 };
 document.getElementById("prevBtn").onclick=()=>{ view.setMonth(view.getMonth()-1); render(); };
 document.getElementById("nextBtn").onclick=()=>{ view.setMonth(view.getMonth()+1); render(); };
@@ -235,6 +314,7 @@ document.getElementById("exportBtn").onclick=()=>{
   a.click();
   URL.revokeObjectURL(a.href);
 };
+
 document.getElementById("importInput").onchange=async(e)=>{
   const file=e.target.files[0]; if(!file) return;
   try{
@@ -243,11 +323,13 @@ document.getElementById("importInput").onchange=async(e)=>{
     data=obj; save(); alert("Backup imported.");
   }catch{ alert("That does not look like a valid Mug Streak backup."); }
 };
+
 document.getElementById("resetBtn").onclick=()=>{
   if(confirm("Delete all Mug Streak data from this browser?")){ data={}; save(); }
 };
 
 render();
+renderBeverages();
 </script>
 </body>
 </html>
