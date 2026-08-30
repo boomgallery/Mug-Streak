@@ -61,18 +61,78 @@
       .mug{font-size:19px}
       .bev-row{grid-template-columns:1fr 1fr}
       .bev-row .remove{grid-column:2}
+      .stat-grid-2,.inline-fields{grid-template-columns:1fr}
     }
+
+    .stat-grid-2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+    .day.within{background:#fff7df;border-color:#dfbd61}
+    .day.violation{background:var(--red-soft);border-color:#d97878}
+    .day.unplanned{background:#f5eef0;border-color:#d8c3c8}
+    .status-pill{display:inline-block;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:800;margin-top:8px}
+    .pill-green{background:var(--green-soft);color:var(--green)}
+    .pill-amber{background:#fff0bf;color:#775700}
+    .pill-red{background:var(--red-soft);color:var(--red)}
+    .pill-gray{background:#eef2f7;color:#4b5563}
+    .rule-box{white-space:pre-wrap;line-height:1.45;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px}
+    .audit-item{border-top:1px solid var(--border);padding:10px 0}
+    .audit-item:first-child{border-top:0}
+    .inline-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .checkrow{display:flex;gap:9px;align-items:flex-start;margin-top:12px}
+    .checkrow input{width:auto;margin-top:3px}
+    .helper{font-size:12px;color:var(--muted);line-height:1.4;margin-top:6px}
   </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Mug Streak ☕</h1>
-  <div class="sub">One green mug for every alcohol-free day. <span style="font-size:11px">v4</span></div>
+  <div class="sub">One green mug for every alcohol-free day. <span style="font-size:11px">v5</span></div>
 
   <div class="grid">
     <div class="stat"><div class="n" id="currentStreak">0</div><div class="l">Current alcohol-free streak</div></div>
     <div class="stat"><div class="n" id="bestStreak">0</div><div class="l">Best streak</div></div>
     <div class="stat"><div class="n" id="monthAF">0</div><div class="l">Alcohol-free days this month</div></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">My rules</h2>
+    <div id="rulesDisplay" class="rule-box">No rules saved yet.</div>
+    <button class="ghost" id="editRulesBtn" style="margin-top:10px">Edit rules & trial</button>
+    <div id="rulesEditor" style="display:none">
+      <label for="rulesInput">Rules for this trial</label>
+      <textarea id="rulesInput" placeholder="Write your rules here — for example when you can drink, your limits, and any non-negotiables."></textarea>
+      <div class="inline-fields">
+        <div>
+          <label for="trialStart">Trial start date</label>
+          <input id="trialStart" type="date" />
+        </div>
+        <div>
+          <label for="defaultLimit">Default planned limit (optional)</label>
+          <input id="defaultLimit" type="number" min="0" step="0.1" inputmode="decimal" placeholder="e.g., 2" />
+        </div>
+      </div>
+      <button class="primary" id="saveRulesBtn" style="margin-top:10px">Save rules</button>
+    </div>
+  </div>
+
+  <div class="stat-grid-2">
+    <div class="stat"><div class="n" id="weekDrinkDays">0</div><div class="l">Drinking days this week</div></div>
+    <div class="stat"><div class="n" id="weekDrinks">0.0</div><div class="l">Standard drinks this week</div></div>
+    <div class="stat"><div class="n" id="trialDrinks">—</div><div class="l">Standard drinks during trial</div></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Today's plan</h2>
+    <div class="small">Set your limit before drinking. Once drinks are logged for today, the plan cannot be changed retroactively.</div>
+    <div class="inline-fields">
+      <div>
+        <label for="todayPlanLimit">Planned standard-drink limit</label>
+        <input id="todayPlanLimit" type="number" min="0" step="0.1" inputmode="decimal" placeholder="Enter before drinking" />
+      </div>
+      <div style="align-self:end">
+        <button class="primary" id="setTodayPlanBtn">Set today's plan</button>
+      </div>
+    </div>
+    <div id="todayPlanStatus" class="small" style="margin-top:10px"></div>
   </div>
 
   <div class="card">
@@ -93,6 +153,24 @@
 
       <label for="manualOverride">Optional manual override</label>
       <input id="manualOverride" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Leave blank to use calculated total" />
+      <label for="overrideReason">Why are you overriding the calculated total?</label>
+      <input id="overrideReason" type="text" placeholder="Required only if you use the override" />
+
+      <label for="occasion">Occasion</label>
+      <input id="occasion" type="text" placeholder="Dinner, brewery, home, game, etc." />
+      <div class="inline-fields">
+        <div>
+          <label for="wantedMore">Did you want more after your planned limit?</label>
+          <select id="wantedMore"><option value="">Not recorded</option><option value="yes">Yes</option><option value="no">No</option></select>
+        </div>
+        <div>
+          <label for="stoppingDifficulty">How hard was stopping? (0–10)</label>
+          <input id="stoppingDifficulty" type="number" min="0" max="10" step="1" inputmode="numeric" placeholder="0–10" />
+        </div>
+      </div>
+      <div class="checkrow"><input id="otherViolation" type="checkbox"><label for="otherViolation" style="margin:0;color:var(--text)">A rule was violated even if the drink total was within the planned limit</label></div>
+      <label for="violationReason">Violation reason</label>
+      <input id="violationReason" type="text" placeholder="Required if you mark a rule violation" />
 
       <button class="danger" id="saveDrinkBtn" style="margin-top:10px">Save drink day</button>
     </div>
@@ -113,9 +191,17 @@
     <div class="cal" id="calendar"></div>
     <div class="legend">
       <span><span class="dot" style="background:var(--green-soft);border:1px solid #9bd4ae"></span>Alcohol-free</span>
-      <span><span class="dot" style="background:var(--red-soft);border:1px solid #e9aaaa"></span>Drank</span>
+      <span><span class="dot" style="background:#fff7df;border:1px solid #dfbd61"></span>Within plan</span>
+      <span><span class="dot" style="background:var(--red-soft);border:1px solid #d97878"></span>Rule violation</span>
+      <span><span class="dot" style="background:#f5eef0;border:1px solid #d8c3c8"></span>Drank / no plan</span>
       <span><span class="dot" style="background:white;border:1px solid var(--border)"></span>Not logged</span>
     </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Violation history</h2>
+    <div class="small">Once a violation is recorded, editing or clearing that calendar day will not erase this history.</div>
+    <div id="auditList" style="margin-top:8px"></div>
   </div>
 
   <div class="card">
@@ -140,12 +226,31 @@
       <div class="small" style="margin-top:8px">
         Enter each beverage’s amount and ABV. One U.S. standard drink = 0.6 fl oz (14 g) of pure alcohol.
       </div>
+      <div id="datePlanStatus" class="small" style="margin-top:8px"></div>
       <div id="dateBeverageList"></div>
       <button class="ghost" id="addDateBeverageBtn" style="margin-top:10px">+ Add another beverage</button>
       <div class="calc-total">Calculated total: <span id="dateCalculatedTotal">0.00</span> standard drinks</div>
 
       <label for="dateManualOverride">Optional manual override</label>
       <input id="dateManualOverride" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Leave blank to use calculated total" />
+      <label for="dateOverrideReason">Why are you overriding the calculated total?</label>
+      <input id="dateOverrideReason" type="text" placeholder="Required only if you use the override" />
+
+      <label for="dateOccasion">Occasion</label>
+      <input id="dateOccasion" type="text" placeholder="Dinner, brewery, home, game, etc." />
+      <div class="inline-fields">
+        <div>
+          <label for="dateWantedMore">Did you want more after your planned limit?</label>
+          <select id="dateWantedMore"><option value="">Not recorded</option><option value="yes">Yes</option><option value="no">No</option></select>
+        </div>
+        <div>
+          <label for="dateStoppingDifficulty">How hard was stopping? (0–10)</label>
+          <input id="dateStoppingDifficulty" type="number" min="0" max="10" step="1" inputmode="numeric" placeholder="0–10" />
+        </div>
+      </div>
+      <div class="checkrow"><input id="dateOtherViolation" type="checkbox"><label for="dateOtherViolation" style="margin:0;color:var(--text)">A rule was violated even if the drink total was within the planned limit</label></div>
+      <label for="dateViolationReason">Violation reason</label>
+      <input id="dateViolationReason" type="text" placeholder="Required if you mark a rule violation" />
 
       <label for="dateNote">Optional note</label>
       <textarea id="dateNote" placeholder="Anything you want to remember about that day?"></textarea>
@@ -160,7 +265,11 @@
 
 <script>
 const KEY = "mugStreakDataV1";
+const SETTINGS_KEY = "mugStreakSettingsV1";
+const AUDIT_KEY = "mugStreakAuditV1";
 let data = JSON.parse(localStorage.getItem(KEY) || "{}");
+let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+let audit = JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]");
 let view = new Date(); view.setDate(1);
 let beverages = [{amount:"", unit:"oz", abv:""}];
 let selectedDateKey = null;
@@ -169,7 +278,20 @@ let dateBeverages = [{amount:"", unit:"oz", abv:""}];
 const pad=n=>String(n).padStart(2,"0");
 const keyFor=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const todayKey=keyFor(new Date());
-function save(){ localStorage.setItem(KEY, JSON.stringify(data)); render(); }
+function save(){
+  localStorage.setItem(KEY, JSON.stringify(data));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  localStorage.setItem(AUDIT_KEY, JSON.stringify(audit));
+  render();
+}
+function appendAudit(entry){
+  const signature = `${entry.date}|${entry.type}|${entry.reason||""}|${entry.total??""}|${entry.limit??""}`;
+  if(!audit.some(x=>x.signature===signature)){
+    audit.push({...entry, signature, recordedAt:new Date().toISOString()});
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(audit));
+  }
+}
+function dayHasViolation(k){ return audit.some(x=>x.date===k && x.type==="violation"); }
 function parseKey(k){ const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d); }
 
 function standardDrinks(amount, unit, abv){
@@ -264,11 +386,76 @@ function openDateEditor(k){
   dateBeverages = rec?.beverages?.length
     ? rec.beverages.map(x=>({...x}))
     : [{amount:"",unit:"oz",abv:""}];
-  document.getElementById("dateManualOverride").value = "";
+  document.getElementById("dateManualOverride").value = rec?.manualOverride ?? "";
+  document.getElementById("dateOverrideReason").value = rec?.overrideReason || "";
+  document.getElementById("dateOccasion").value = rec?.occasion || "";
+  document.getElementById("dateWantedMore").value = rec?.wantedMore || "";
+  document.getElementById("dateStoppingDifficulty").value = rec?.stoppingDifficulty ?? "";
+  document.getElementById("dateOtherViolation").checked = false;
+  document.getElementById("dateViolationReason").value = "";
   document.getElementById("dateNote").value = rec?.note || "";
+  document.getElementById("datePlanStatus").textContent = rec?.plannedLimit!=null && rec.plannedLimit!==""
+    ? `Pre-recorded plan: ${rec.plannedLimit} standard drinks${rec.plannedAt?` · set ${new Date(rec.plannedAt).toLocaleString()}`:""}`
+    : "No pre-drinking plan was recorded for this day.";
   renderDateBeverages();
   const modal=document.getElementById("dateDrinkModal");
   modal.style.display="flex";
+}
+
+function startOfWeek(d){
+  const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  x.setDate(x.getDate()-x.getDay());
+  return x;
+}
+function planStateFor(k,rec){
+  if(dayHasViolation(k)) return "violation";
+  if(rec?.status!=="drink") return null;
+  const limit=Number(rec.plannedLimit);
+  if(Number.isFinite(limit) && rec.plannedLimit!=="" && rec.plannedLimit!=null){
+    return Number(rec.drinks||0)<=limit ? "within" : "violation";
+  }
+  return "unplanned";
+}
+function renderAudit(){
+  const el=document.getElementById("auditList");
+  if(!el) return;
+  const items=[...audit].filter(x=>x.type==="violation").sort((a,b)=>(b.recordedAt||"").localeCompare(a.recordedAt||""));
+  if(!items.length){ el.innerHTML='<div class="small">No violations recorded.</div>'; return; }
+  el.innerHTML=items.map(x=>`<div class="audit-item"><strong>${x.date}</strong> — ${x.reason||"Rule violation"}<div class="small">${x.total!=null?Number(x.total).toFixed(2)+" drinks":""}${x.limit!=null?` · planned limit ${x.limit}`:""} · recorded ${new Date(x.recordedAt).toLocaleString()}</div></div>`).join("");
+}
+function renderSettings(){
+  const rules=(settings.rules||"").trim();
+  document.getElementById("rulesDisplay").textContent=rules||"No rules saved yet.";
+  document.getElementById("rulesInput").value=settings.rules||"";
+  document.getElementById("trialStart").value=settings.trialStart||"";
+  document.getElementById("defaultLimit").value=settings.defaultLimit??"";
+}
+function renderTotals(){
+  const now=new Date();
+  const ws=startOfWeek(now);
+  const we=new Date(ws); we.setDate(we.getDate()+7);
+  let days=0,total=0,trial=0;
+  for(const [k,r] of Object.entries(data)){
+    if(r?.status!=="drink") continue;
+    const d=parseKey(k);
+    if(d>=ws && d<we){ days++; total+=Number(r.drinks)||0; }
+    if(settings.trialStart && k>=settings.trialStart && k<=todayKey) trial+=Number(r.drinks)||0;
+  }
+  document.getElementById("weekDrinkDays").textContent=days;
+  document.getElementById("weekDrinks").textContent=total.toFixed(1);
+  document.getElementById("trialDrinks").textContent=settings.trialStart?trial.toFixed(1):"—";
+}
+function renderTodayPlan(){
+  const rec=data[todayKey]||{};
+  const input=document.getElementById("todayPlanLimit");
+  if(rec.plannedLimit!=null && rec.plannedLimit!=="") input.value=rec.plannedLimit;
+  else if(input.value==="" && settings.defaultLimit!=null) input.value=settings.defaultLimit;
+  input.disabled=rec.status==="drink";
+  document.getElementById("setTodayPlanBtn").disabled=rec.status==="drink";
+  const el=document.getElementById("todayPlanStatus");
+  if(rec.plannedLimit!=null && rec.plannedLimit!==""){
+    el.textContent=`Plan: ${rec.plannedLimit} standard drinks${rec.plannedAt?` · set ${new Date(rec.plannedAt).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`:""}`;
+  } else { el.textContent="No planned limit recorded for today yet."; }
 }
 
 function streaks(){
@@ -296,6 +483,10 @@ function render(){
   }).length;
   document.getElementById("monthAF").textContent=monthAF;
   document.getElementById("monthTitle").textContent=view.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  renderSettings();
+  renderTotals();
+  renderTodayPlan();
+  renderAudit();
 
   const cal=document.getElementById("calendar"); cal.innerHTML="";
   const first=new Date(y,m,1);
@@ -308,7 +499,10 @@ function render(){
     if(d.getMonth()!==m) cell.classList.add("other");
     if(k===todayKey) cell.classList.add("today");
     if(rec?.status==="af") cell.classList.add("af");
-    if(rec?.status==="drink") cell.classList.add("drink");
+    if(rec?.status==="drink"){
+      const ps=planStateFor(k,rec);
+      cell.classList.add(ps==="within"?"within":ps==="violation"?"violation":"unplanned");
+    }
     cell.innerHTML=`<span class="num">${d.getDate()}</span>` +
       (rec?.status==="af" ? `<span class="mug">☕</span>` : "") +
       (rec?.status==="drink" ? `<span class="drinks">${Number(rec.drinks ?? 0).toFixed(1)}</span>` : "");
@@ -319,15 +513,38 @@ function render(){
 
   const rec=data[todayKey];
   document.getElementById("note").value=rec?.note || "";
+  const state=planStateFor(todayKey,rec);
   document.getElementById("todayStatus").textContent =
     rec?.status==="af" ? "Today is logged alcohol-free. ☕" :
-    rec?.status==="drink" ? `Today is logged with ${Number(rec.drinks ?? 0).toFixed(2)} standard drinks.` :
+    rec?.status==="drink" ? `Today is logged with ${Number(rec.drinks ?? 0).toFixed(2)} standard drinks${state==="within"?" · within plan":state==="violation"?" · rule violation":state==="unplanned"?" · no plan recorded":""}.` :
     "Today is not logged yet.";
 }
 
 function editDate(k){
   openDateEditor(k);
 }
+
+document.getElementById("editRulesBtn").onclick=()=>{
+  const el=document.getElementById("rulesEditor");
+  el.style.display=el.style.display==="none"?"block":"none";
+};
+document.getElementById("saveRulesBtn").onclick=()=>{
+  settings.rules=document.getElementById("rulesInput").value.trim();
+  settings.trialStart=document.getElementById("trialStart").value;
+  const dl=document.getElementById("defaultLimit").value.trim();
+  settings.defaultLimit=dl===""?"":Number(dl);
+  document.getElementById("rulesEditor").style.display="none";
+  save();
+};
+document.getElementById("setTodayPlanBtn").onclick=()=>{
+  const existing=data[todayKey]||{};
+  if(existing.status==="drink"){ alert("Drinks are already logged for today, so the planned limit cannot be changed retroactively."); return; }
+  const raw=document.getElementById("todayPlanLimit").value.trim();
+  const limit=Number(raw);
+  if(raw==="" || !Number.isFinite(limit) || limit<0){ alert("Enter a valid planned limit."); return; }
+  data[todayKey]={...existing,plannedLimit:limit,plannedAt:new Date().toISOString()};
+  save();
+};
 
 document.getElementById("afBtn").onclick=()=>{
   data[todayKey]={...(data[todayKey]||{}),status:"af",drinks:0,beverages:[]};
@@ -342,7 +559,13 @@ document.getElementById("drinkBtn").onclick=()=>{
   if(opening){
     const existing=data[todayKey];
     beverages = existing?.beverages?.length ? existing.beverages.map(x=>({...x})) : [{amount:"",unit:"oz",abv:""}];
-    document.getElementById("manualOverride").value="";
+    document.getElementById("manualOverride").value=existing?.manualOverride ?? "";
+    document.getElementById("overrideReason").value=existing?.overrideReason || "";
+    document.getElementById("occasion").value=existing?.occasion || "";
+    document.getElementById("wantedMore").value=existing?.wantedMore || "";
+    document.getElementById("stoppingDifficulty").value=existing?.stoppingDifficulty ?? "";
+    document.getElementById("otherViolation").checked=false;
+    document.getElementById("violationReason").value="";
     renderBeverages();
   }
 };
@@ -356,15 +579,27 @@ document.getElementById("saveDrinkBtn").onclick=()=>{
   const calc=beverageTotal();
   const overrideRaw=document.getElementById("manualOverride").value.trim();
   const override=overrideRaw==="" ? null : Number(overrideRaw);
+  const overrideReason=document.getElementById("overrideReason").value.trim();
+  if(override!==null && !overrideReason){ alert("Please explain the manual override."); return; }
   const total=override===null ? calc : override;
   if(!Number.isFinite(total) || total<0){ alert("Enter valid beverage information or a valid manual override."); return; }
   if(total===0 && !confirm("Calculated total is 0. Save this as a drinking day?")) return;
+  const otherViolation=document.getElementById("otherViolation").checked;
+  const violationReason=document.getElementById("violationReason").value.trim();
+  if(otherViolation && !violationReason){ alert("Please enter the rule violation reason."); return; }
+  const existing=data[todayKey]||{};
+  const plannedLimit=existing.plannedLimit;
+  const automaticViolation=plannedLimit!=null && plannedLimit!=="" && total>Number(plannedLimit);
   data[todayKey]={
-    ...(data[todayKey]||{}),
-    status:"drink",
-    drinks:Number(total.toFixed(3)),
-    beverages:beverages.map(b=>({amount:Number(b.amount)||0,unit:b.unit,abv:Number(b.abv)||0}))
+    ...existing, status:"drink", drinks:Number(total.toFixed(3)),
+    beverages:beverages.map(b=>({amount:Number(b.amount)||0,unit:b.unit,abv:Number(b.abv)||0})),
+    manualOverride:override, overrideReason:overrideReason||null,
+    occasion:document.getElementById("occasion").value.trim(),
+    wantedMore:document.getElementById("wantedMore").value,
+    stoppingDifficulty:document.getElementById("stoppingDifficulty").value===""?null:Number(document.getElementById("stoppingDifficulty").value)
   };
+  if(automaticViolation){ appendAudit({date:todayKey,type:"violation",reason:`Exceeded planned limit of ${plannedLimit}`,total:Number(total.toFixed(3)),limit:Number(plannedLimit)}); }
+  if(otherViolation){ appendAudit({date:todayKey,type:"violation",reason:violationReason,total:Number(total.toFixed(3)),limit:plannedLimit==null?null:Number(plannedLimit)}); }
   document.getElementById("drinkFields").style.display="none";
   save();
 };
@@ -398,24 +633,29 @@ document.getElementById("saveDateDrinkBtn").onclick=()=>{
   const calc=dateBeverageTotal();
   const overrideRaw=document.getElementById("dateManualOverride").value.trim();
   const override=overrideRaw==="" ? null : Number(overrideRaw);
+  const overrideReason=document.getElementById("dateOverrideReason").value.trim();
+  if(override!==null && !overrideReason){ alert("Please explain the manual override."); return; }
   const total=override===null ? calc : override;
-  if(!Number.isFinite(total) || total<0){
-    alert("Enter valid beverage information or a valid manual override.");
-    return;
-  }
+  if(!Number.isFinite(total) || total<0){ alert("Enter valid beverage information or a valid manual override."); return; }
   if(total===0 && !confirm("Calculated total is 0. Save this as a drinking day?")) return;
+  const otherViolation=document.getElementById("dateOtherViolation").checked;
+  const violationReason=document.getElementById("dateViolationReason").value.trim();
+  if(otherViolation && !violationReason){ alert("Please enter the rule violation reason."); return; }
+  const existing=data[selectedDateKey]||{};
+  const plannedLimit=existing.plannedLimit;
+  const automaticViolation=plannedLimit!=null && plannedLimit!=="" && total>Number(plannedLimit);
   const note=document.getElementById("dateNote").value.trim();
   data[selectedDateKey]={
-    ...(data[selectedDateKey]||{}),
-    status:"drink",
-    drinks:Number(total.toFixed(3)),
-    beverages:dateBeverages.map(b=>({
-      amount:Number(b.amount)||0,
-      unit:b.unit,
-      abv:Number(b.abv)||0
-    })),
+    ...existing, status:"drink", drinks:Number(total.toFixed(3)),
+    beverages:dateBeverages.map(b=>({amount:Number(b.amount)||0,unit:b.unit,abv:Number(b.abv)||0})),
+    manualOverride:override, overrideReason:overrideReason||null,
+    occasion:document.getElementById("dateOccasion").value.trim(),
+    wantedMore:document.getElementById("dateWantedMore").value,
+    stoppingDifficulty:document.getElementById("dateStoppingDifficulty").value===""?null:Number(document.getElementById("dateStoppingDifficulty").value),
     note
   };
+  if(automaticViolation){ appendAudit({date:selectedDateKey,type:"violation",reason:`Exceeded planned limit of ${plannedLimit}`,total:Number(total.toFixed(3)),limit:Number(plannedLimit)}); }
+  if(otherViolation){ appendAudit({date:selectedDateKey,type:"violation",reason:violationReason,total:Number(total.toFixed(3)),limit:plannedLimit==null?null:Number(plannedLimit)}); }
   document.getElementById("dateDrinkModal").style.display="none";
   save();
 };
@@ -444,25 +684,27 @@ document.getElementById("clearDateBtn").onclick=()=>{
 };
 
 document.getElementById("exportBtn").onclick=()=>{
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const bundle={version:5,data,settings,audit};
+  const blob=new Blob([JSON.stringify(bundle,null,2)],{type:"application/json"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
   a.download=`mug-streak-backup-${todayKey}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  a.click(); URL.revokeObjectURL(a.href);
 };
 
 document.getElementById("importInput").onchange=async(e)=>{
   const file=e.target.files[0]; if(!file) return;
   try{
     const obj=JSON.parse(await file.text());
-    if(typeof obj!=="object" || Array.isArray(obj)) throw new Error();
-    data=obj; save(); alert("Backup imported.");
+    if(obj && obj.version && obj.data){ data=obj.data||{}; settings=obj.settings||{}; audit=obj.audit||[]; }
+    else if(typeof obj==="object" && !Array.isArray(obj)){ data=obj; }
+    else throw new Error();
+    save(); alert("Backup imported.");
   }catch{ alert("That does not look like a valid Mug Streak backup."); }
 };
 
 document.getElementById("resetBtn").onclick=()=>{
-  if(confirm("Delete all Mug Streak data from this browser?")){ data={}; save(); }
+  if(confirm("Delete all Mug Streak data, rules, and violation history from this browser?")){ data={}; settings={}; audit=[]; save(); }
 };
 
 render();
